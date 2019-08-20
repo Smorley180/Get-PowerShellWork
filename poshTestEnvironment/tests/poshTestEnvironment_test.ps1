@@ -94,6 +94,7 @@ Describe "New-Rectangle" {
             $File = Get-Content "$env:TEMP\Test.jpg"
             $File.Length | Should -be 0
             New-Rectangle "$env:TEMP\Test.jpg"
+            $File = Get-Content "$env:TEMP\test.jpg"
             $File.Length | Should -be 0
             Remove-Item "$env:TEMP\Test.jpg"
         }
@@ -174,8 +175,9 @@ Describe "New-TestFiles" {
 Describe "New-DirectoryStructure" {
     Context "Can create a random amount of folders" {
         Mock Get-Random { return 5 }
-        # Still a bit slow but shouldn't make folders with same name breaking the test
-        Mock New-TestingName { $Random = New-Object System.Random; Start-Sleep 0.2; $Rand = New-Object System.Random; Return "$($Random.Next())" + "$($Rand.Next())" }
+        # Fixed
+        $Random = New-Object System.Random
+        Mock New-TestingName { return $Random.Next() }
 
         It "Creates folders" {
             New-DirectoryStructure -Directory "$env:TEMP\Test" -Depth 1
