@@ -45,14 +45,14 @@ Describe "New-VoiceSynthesizer" {
 
 Describe "New-Rectangle" {
     It "Accepts only set colors" {
-        { New-Rectangle -File New-TemporaryFile -colour "Black" } | Should -Not -Throw
-        { New-Rectangle -File New-TemporaryFile -colour "Yellow" } | Should -Not -Throw
-        { New-Rectangle -File New-TemporaryFile -colour "Red" } | Should -Not -Throw
-        { New-Rectangle -File New-TemporaryFile -colour "White" } | Should -Not -Throw
-        { New-Rectangle -File New-TemporaryFile -colour "Green" } | Should -Not -Throw
-        { New-Rectangle -File New-TemporaryFile -colour "Blue" } | Should -Not -Throw
-        { New-Rectangle -File New-TemporaryFile -colour "Orange" } | Should -Not -Throw
-        { New-Rectangle -File New-TemporaryFile -colour "Silver" } | Should -Throw
+        { New-Rectangle -File New-TemporaryFile -colour "Black" -Force } | Should -Not -Throw
+        { New-Rectangle -File New-TemporaryFile -colour "Yellow" -Force } | Should -Not -Throw
+        { New-Rectangle -File New-TemporaryFile -colour "Red" -Force } | Should -Not -Throw
+        { New-Rectangle -File New-TemporaryFile -colour "White" -Force } | Should -Not -Throw
+        { New-Rectangle -File New-TemporaryFile -colour "Green" -Force } | Should -Not -Throw
+        { New-Rectangle -File New-TemporaryFile -colour "Blue" -Force } | Should -Not -Throw
+        { New-Rectangle -File New-TemporaryFile -colour "Orange" -Force } | Should -Not -Throw
+        { New-Rectangle -File New-TemporaryFile -colour "Silver" -Force } | Should -Throw
     }
 
     It "Creates a file if none is found" {
@@ -83,6 +83,33 @@ Describe "New-Rectangle" {
         $File = (Get-Content "$ENV:TEMP\temp.jpg")
         $File.Length | Should -be 5
         Remove-Item "$ENV:TEMP\temp.jpg"
+    }
+
+    Context "If file already exists" {
+        Mock Read-Host { return "N" } -ParameterFilter { $Prompt -eq "$($File) already exists are you sure you want to overwrite? Y/N" }
+
+
+        It "Prompts to overwrite" {
+            New-Item "$env:TEMP\Test.jpg"
+            $File = Get-Content "$env:TEMP\Test.jpg"
+            $File.Length | Should -be 0
+            New-Rectangle "$env:TEMP\Test.jpg"
+            $File.Length | Should -be 0
+            Remove-Item "$env:TEMP\Test.jpg"
+        }
+    }
+    Context "If file already exists and you want to replace it" {
+        Mock Read-Host { return "Y" } -ParameterFilter { $Prompt -eq "$($File) already exists are you sure you want to overwrite? Y/N" }
+
+        It "Overwrites the file" {
+            New-Item "$env:TEMP\Test.jpg"
+            $File = Get-Content "$env:TEMP\Test.jpg"
+            $File.Length | Should -be 0
+            New-Rectangle "$env:TEMP\Test.jpg" -Colour "Blue"
+            $File = Get-Content "$env:TEMP\Test.jpg"
+            $File.Length | Should -be 5
+            Remove-Item "$env:TEMP\Test.jpg"
+        }
     }
 }
 
@@ -147,8 +174,8 @@ Describe "New-TestFiles" {
 Describe "New-DirectoryStructure" {
     Context "Can create a random amount of folders" {
         Mock Get-Random { return 5 }
-        # Awkward step here that massively slows testing down, not sure how it could be changed outside of rewriting either function.
-        Mock New-TestingName { $Random = New-Object System.Random; Start-Sleep 1; Return $Random.Next() }
+        # Still a bit slow but shouldn't make folders with same name breaking the test
+        Mock New-TestingName { $Random = New-Object System.Random; Start-Sleep 0.2; $Rand = New-Object System.Random; Return "$($Random.Next())" + "$($Rand.Next())" }
 
         It "Creates folders" {
             New-DirectoryStructure -Directory "$env:TEMP\Test" -Depth 1

@@ -1,11 +1,11 @@
+# Class for dynamically setting ParameterValidationValues unfortunately only works in PS Core so currently unused.
 <#class VoiceNames : System.Management.Automation.IValidateSetValuesGenerator {
     [String[]] GetValidValues() {
         Add-Type -AssemblyName System.Speech
         $Speech = New-Object System.Speech.Synthesis.SpeechSynthesizer
         $Voices = $Speech | Select-Object -ExpandProperty VoiceInfo
         return [String[]] $Voices
-    }
-    
+    } 
 }#>
 
 
@@ -143,17 +143,20 @@ Width of rectangle to create.
 .Parameter Height
 Height of rectangle to create.
 .Parameter Colour
-Colour of rectangle to creatre.
+Colour of rectangle to create.
+.Parameter Force
+Overwrite files without prompt.
 .Example
 PS C:\> New-Rectangle
 Creates a random text-to-speech.
 .Example
-PS C:\> New-VoiceSynthesizer -SpeechRate 3 -Speech "Robot voice." -Voice "Microsoft David Desktop"
-Speaks the phrase "Robot Voice" with a speed of 3 and through the tones of David.
+PS C:\> New-Rectangle -File F:\Test\Rectangle.tiff
+Creates a rectangle with a random colour and saves it as Rectangle.tiff
 .Example
-PS C:\> New-VoiceSynthesizer -file "F:\Phrases\phrase.wav"
-Creates a random text-to-speech and saves it as phrase. 
+PS C:\> New-Rectangle -File F:\Test\Rectangle.tiff -Width 400 -Height 400 -Colour "Black"
+Creates a rectangle with height 400px and width 400px that is coloured black.
 #>
+    [cmdletbinding()]
     param (
         # Location to save
         [Parameter(Mandatory = $true)]
@@ -171,7 +174,11 @@ Creates a random text-to-speech and saves it as phrase.
         [Parameter(Mandatory = $false)]
         [ValidateSet("Black", "Yellow", "Red", "White", "Green", "Blue", "Orange")]
         [String]
-        $Colour = (Get-Random("Black", "Yellow", "Red", "White", "Green", "Blue", "Orange"))
+        $Colour = (Get-Random("Black", "Yellow", "Red", "White", "Green", "Blue", "Orange")),
+        # Don't prompt to overwrite file
+        [Parameter(Mandatory = $false)]
+        [Switch]
+        $Force
     )
     # Add the needed assembly.
     Add-Type -AssemblyName System.Drawing
@@ -192,12 +199,19 @@ Creates a random text-to-speech and saves it as phrase.
     # Create a rectangle 
     $graphics.FillRectangle($brush, 0, 0, $bmp.Width, $bmp.Height)
     $graphics.Dispose()
-    # Save the bitmap to file.
-    if (-not(Test-Path $file)) {
+    # Check if the file exists create it if it doesn't
+    if ((Test-Path $file) -and (-not($Force))) { 
+        $Confirmation = Read-Host "$($File) already exists are you sure you want to overwrite? Y/N"
+        if ($Confirmation -ne "Y") {
+            Return
+            Write-Verbose "The file at $($File) was not overwritten."
+        }
+    }
+    elseif (-not(Test-Path $file)) {
         New-Item $File
     }
+    # Save to file
     $bmp.Save($File)
-    #return $bmp
 }
 
 function New-LorumIpsum {
@@ -315,7 +329,7 @@ Creates files.
             }
         }
         # Create our array to hold the generated items.
-        $Table = @()
+        $Table = [System.Collections.ArrayList]@()
         if ($Employee) {
             # Load in the needed data files.
             $MaleNames = Get-Content "$templates\First_Names_M.txt"
@@ -327,12 +341,12 @@ Creates files.
                 $Gender = Get-Random ("Male", "Female")
                 $User = @{
                     "First Name" = If ($Gender -eq "Male") { Get-Random($MaleNames) } else { Get-Random($FemaleNames) }
-                    "Last Name" = Get-Random($LastNames)
-                    "Job Title" = Get-Random($JobTitle)
+                    "Last Name"  = Get-Random($LastNames)
+                    "Job Title"  = Get-Random($JobTitle)
                 }
                 [PSCustomObject]$User
                 # Add the data point to the array
-                $Table += $User
+                $Table.Add($User) | Out-Null
             }
         }
         if ($Product) {
@@ -340,12 +354,12 @@ Creates files.
             $Suffix = Get-Content "$templates\Nouns.txt"
             for ($i = 0; $i -lt $tablerows; $i++) {
                 $User = @{
-                    "Item" = "$(Get-Random($Prefix)) $(Get-Random($Suffix))"
-                    "Cost" = "`$$(Get-Random(0..1000)).$(([string](Get-Random(0..99))).PadLeft(2,'0'))"
+                    "Item"            = "$(Get-Random($Prefix)) $(Get-Random($Suffix))"
+                    "Cost"            = "`$$(Get-Random(0..1000)).$(([string](Get-Random(0..99))).PadLeft(2,'0'))"
                     "Stock Remaining" = "$(Get-Random(1..1000))"
                 }
                 [PSCustomObject]$Item
-                $Table += $Item
+                $Table.Add($Item) | Out-Null
             }
         }
         Return $Table
@@ -509,7 +523,7 @@ Creates folders with a depth of 2.
 function Set-TestFiles {
     <#
 .Synopsis
-Files files in a directory with testing information.
+Sets files in a directory with testing information.
 .Description
 Utilises the New-LorumIpsum, New-Rectangle, New-VoiceSynthesizer and New-TestTable cmdlets to create test information and adds that to files.
 .Parameter Directory
@@ -520,12 +534,15 @@ The amount of paragraphs to be generated in text files.
 The Length of the paragraphs to be generated in text files.
 .Parameter TableRows
 The amount of objects to create in the table, by default it will create between 4 and 8. Used for .csv and .xls.
+.Parameter Recurse
+Sets the files in any subdirectories found.
 .Example
-PS C:\> $text = New-LorumIpsum -TextLength "Long" -TextAmount 30
-Assigns lorum ipsum to a text variable.
+PS C:\> Set-TestFiles -Directory F:/Test
+Finds files in the F:/Test directory and sets them to be randomly generated data.
 .Example
-PS C:\> New-LorumIpsum -Headers -UnorderedLists | Out-File .\LorumIpsum.txt
-Exports lorum ipsum to a text file.
+PS C:\> Sets-TestFiles -Directory F:/Test -Recurse
+Finds files in the F:/Test directory and sets them to be randomly generated data, any
+files in subdirectories found will be set as well.
 #>
     param (
         # Parameter help description
@@ -564,7 +581,7 @@ Exports lorum ipsum to a text file.
     }
     foreach ($file in ($file_list | Where-Object { $_.Extension -like ".png" `
                     -or $_.Extension -like ".jpeg" -or $_.Extension -like ".tiff" })) {
-        New-Rectangle -File $file.FullName
+        New-Rectangle -File $file.FullName -Force
     }
     foreach ($file in ($file_list | Where-Object { $_.Extension -like ".wav" })) {
         New-VoiceSynthesizer -File $file.FullName
@@ -633,12 +650,13 @@ Exports lorum ipsum to a text file.
     Set-TestFiles -Directory "$($Directory)\$($Name)" -TextLength $TextLength -TextAmount $TextAmount -Recurse
 }
 
-#New-TestEnvironment -Path "F:\" -name "Testicles" -TextLength "Short" -TextAmount "1" -depth 2
+# Commands to test functions without reloading the module.
+#New-TestEnvironment -Path "F:\" -name "Test" -TextLength "Short" -TextAmount "1" -depth 2
 #New-DirectoryStructure -directory "F:\Test" -depth 0
 #New-LorumIpsum -TextLength "Very Long" -TextAmount 10 -Headers
 #New-TestFiles -directory F:\Test2 -FileType .csv
 #New-TestTable -TableRows 100 -Product
-#New-TestTable | Export-Csv F:\Testicles\wvufdjcshjohlxae.csv -NoTypeInformation
-#New-Rectangle -File F:\Testicles\nhucglbxogrxogqzs.tiff
-#New-VoiceSynthesizer <#-File F:\Testicles\Speech.wav#> -Voice "Microsoft Hazel Desktop" -SpeechRate -10 -Speech "Hilarious banter mate."
+#New-TestTable | Export-Csv F:\Test\wvufdjcshjohlxae.csv -NoTypeInformation
+#New-Rectangle -File F:\Test\nhucglbxogrxogqzs.tiff
+#New-VoiceSynthesizer <#-File F:\Test\Speech.wav#> -Voice "Microsoft Hazel Desktop" -SpeechRate -10 -Speech "Hilarious banter mate."
 #Get-VoiceSynthesizers

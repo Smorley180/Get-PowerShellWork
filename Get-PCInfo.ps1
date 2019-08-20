@@ -18,7 +18,11 @@ Get information about all AD computers and export it to csv.
     (
         [Parameter(Mandatory = $True,
             ValueFromPipeline = $True)]
-        $ComputerName
+        $ComputerName,
+        # Credentials for the CIMsession
+        [Parameter(Mandatory = $false)]
+        [System.Management.Automation.PSCredential]
+        $Credential
     )
     foreach ($Computer in $ComputerName) {
         #Check if the pc is reachable, continue to next item if not.
